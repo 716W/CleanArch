@@ -21,6 +21,8 @@ public static class DependencyInjection
             options.UseSqlite(connectionString));
 
         services.AddScoped<IMemberRepository, MemberRepository>();
+        services.AddScoped<IMembershipRepository, MembershipRepository>();
+        services.AddScoped<IMembershipPlanRepository, MembershipPlanRepository>();
 
         services.AddSingleton<ISendGridClient>(_ =>
             new SendGridClient(configuration["SendGrid:ApiKey"])
