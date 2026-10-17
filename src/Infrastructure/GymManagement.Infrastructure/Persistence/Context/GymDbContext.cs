@@ -10,6 +10,8 @@ public class GymDbContext : DbContext
     }
 
     public DbSet<Member> Members => Set<Member>();
+    public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
+    public DbSet<Membership> Memberships => Set<Membership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
