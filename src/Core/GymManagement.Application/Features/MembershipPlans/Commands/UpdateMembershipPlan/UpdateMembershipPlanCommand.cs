@@ -10,4 +10,4 @@ public record UpdateMembershipPlanCommand(
     decimal Price,
     int MaxFreezeDays,
     int DisplayOrder
-) : IRequest<MembershipPlanResponse?>;
+) : IRequest<MembershipPlanResponse>;
