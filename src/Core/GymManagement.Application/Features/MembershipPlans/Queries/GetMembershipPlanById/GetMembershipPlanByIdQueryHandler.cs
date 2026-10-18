@@ -1,5 +1,6 @@
 using AutoMapper;
 using GymManagement.Application.Contracts.Persistence;
+using GymManagement.Application.Exceptions;
 using GymManagement.Application.Features.MembershipPlans.DTOs;
 using MediatR;
 
@@ -23,7 +24,7 @@ public class GetMembershipPlanByIdQueryHandler : IRequestHandler<GetMembershipPl
         var plan = await _repository.GetByIdAsync(request.Id, cancellationToken);
 
         if (plan is null)
-            throw new KeyNotFoundException($"Membership plan with id '{request.Id}' was not found.");
+            throw new NotFoundException($"Membership plan with id '{request.Id}' was not found.");
 
         return _mapper.Map<MembershipPlanResponse>(plan);
     }

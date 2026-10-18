@@ -11,6 +11,7 @@ namespace GymManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Route("api/members")]
 [Produces("application/json")]
 public class MemberController(ISender sender) : ControllerBase
 {
@@ -19,91 +20,64 @@ public class MemberController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<MemberResponse>> Create(
         [FromBody] CreateMemberCommand command,
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
         var member = await sender.Send(command, ct);
         return CreatedAtAction(
             nameof(GetById),
             new { id = member.Id },
-            member
-        );
+            member);
     }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(MemberResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(MemberResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MemberResponse>> GetById(
         [FromRoute] Guid id,
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
-        var member = await sender.Send(
-            new GetMemberQuery(id),
-            ct
-        );
-
-        if (member is null)
-            return NotFound();
-
+        var member = await sender.Send(new GetMemberQuery(id), ct);
         return Ok(member);
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<MemberResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<MemberResponse>>> GetAll(
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
-        var members = sender.Send(
-            new GetMembersQuery(),
-            ct
-        );
-
+        var members = await sender.Send(new GetMembersQuery(), ct);
         return Ok(members);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(MemberResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MemberResponse>> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateMemberCommand command,
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
-        if (id != command.id)
+        if (id != command.Id)
         {
             ModelState.AddModelError(
-                nameof(command.id),
-                "Route ID must match the request ID ."
-            );
+                nameof(command.Id),
+                "Route ID must match the request body ID.");
             return ValidationProblem(ModelState);
         }
 
         var member = await sender.Send(command, ct);
-
-        if (member is null)
-            return NotFound();
-
         return Ok(member);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(
         [FromRoute] Guid id,
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
-        var deleted = await sender.Send(
-            new DeleteMemberCommand(id),
-            ct
-        );
-
-        if (!deleted)
-            return NotFound();
-
+        await sender.Send(new DeleteMemberCommand(id), ct);
         return NoContent();
     }
 }

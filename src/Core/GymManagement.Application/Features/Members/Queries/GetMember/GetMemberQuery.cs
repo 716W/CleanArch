@@ -3,4 +3,4 @@ using MediatR;
 
 namespace GymManagement.Application.Features.Members.Queries.GetMember;
 
-public record GetMemberQuery(Guid Id) : IRequest<MemberResponse?>;
+public record GetMemberQuery(Guid Id) : IRequest<MemberResponse>;

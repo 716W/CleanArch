@@ -1,4 +1,5 @@
 using GymManagement.Application.Contracts.Persistence;
+using GymManagement.Application.Exceptions;
 using MediatR;
 
 namespace GymManagement.Application.Features.MembershipPlans.Commands.DeactivateMembershipPlan;
@@ -19,7 +20,7 @@ public class DeactivateMembershipPlanCommandHandler : IRequestHandler<Deactivate
         var plan = await _repository.GetByIdAsync(request.Id, cancellationToken);
 
         if (plan is null)
-            return false;
+            throw new NotFoundException($"Membership plan with id '{request.Id}' was not found.");
 
         plan.IsActive = false;
         await _repository.UpdateAsync(plan, cancellationToken);

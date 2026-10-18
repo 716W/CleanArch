@@ -1,5 +1,6 @@
 using AutoMapper;
 using GymManagement.Application.Contracts.Persistence;
+using GymManagement.Application.Exceptions;
 using GymManagement.Application.Features.Memberships.DTOs;
 using MediatR;
 
@@ -7,21 +8,34 @@ namespace GymManagement.Application.Features.Memberships.Queries.GetMembershipsB
 
 public class GetMembershipsByMemberQueryHandler : IRequestHandler<GetMembershipsByMemberQuery, IReadOnlyList<MembershipResponse>>
 {
-    private readonly IMembershipRepository _repository;
+    private readonly IMemberRepository _memberRepository;
+    private readonly IMembershipRepository _membershipRepository;
     private readonly IMapper _mapper;
 
-    public GetMembershipsByMemberQueryHandler(IMembershipRepository repository, IMapper mapper)
+    public GetMembershipsByMemberQueryHandler(
+        IMemberRepository memberRepository,
+        IMembershipRepository membershipRepository,
+        IMapper mapper)
     {
-        _repository = repository;
+        _memberRepository = memberRepository;
+        _membershipRepository = membershipRepository;
         _mapper = mapper;
     }
 
-    async Task<IReadOnlyList<MembershipResponse>> IRequestHandler<GetMembershipsByMemberQuery, IReadOnlyList<MembershipResponse>>.Handle(GetMembershipsByMemberQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MembershipResponse>> Handle(
+        GetMembershipsByMemberQuery request,
+        CancellationToken cancellationToken)
     {
-        var memberships = await _repository.GetByMemberIdAsync(
+        var member = await _memberRepository.GetByIdAsync(request.MemberId, cancellationToken);
+        if (member is null)
+        {
+            throw new NotFoundException($"Member with id '{request.MemberId}' was not found.");
+        }
+
+        var memberships = await _membershipRepository.GetByMemberIdAsync(
             request.MemberId,
             cancellationToken);
 
-        return _mapper.Map<List<MembershipResponse>>(memberships);
+        return _mapper.Map<IReadOnlyList<MembershipResponse>>(memberships);
     }
 }

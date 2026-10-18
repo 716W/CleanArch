@@ -1,9 +1,6 @@
+using GymManagement.Api.Middlewares;
 using GymManagement.Application;
-using GymManagement.Application.Features.Members.Commands.CreateMember;
-using GymManagement.Application.Features.Members.Queries.GetMember;
-using GymManagement.Application.Features.Members.Queries.GetMembers;
 using GymManagement.Infrastructure;
-using MediatR;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -29,7 +26,15 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
+    // Add Global Exception Handler
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
     var app = builder.Build();
+
+    app.UseSerilogRequestLogging();
+
+    app.UseExceptionHandler();
 
     if (app.Environment.IsDevelopment())
     {
@@ -37,30 +42,9 @@ try
         app.UseSwaggerUI();
     }
 
-    app.MapControllers();
-
-    // Configure the HTTP request pipeline.
-    app.UseSerilogRequestLogging();
     app.UseHttpsRedirection();
 
-    // // Member Endpoints
-    // app.MapPost("/api/members", async (CreateMemberCommand command, ISender sender, CancellationToken cancellationToken) =>
-    // {
-    //     var result = await sender.Send(command, cancellationToken);
-    //     return Results.Created($"/api/members/{result.Id}", result);
-    // });
-
-    // app.MapGet("/api/members/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
-    // {
-    //     var result = await sender.Send(new GetMemberQuery(id), cancellationToken);
-    //     return result is not null ? Results.Ok(result) : Results.NotFound();
-    // });
-
-    // app.MapGet("/api/members", async (ISender sender, CancellationToken cancellationToken) =>
-    // {
-    //     var result = await sender.Send(new GetMembersQuery(), cancellationToken);
-    //     return Results.Ok(result);
-    // });
+    app.MapControllers();
 
     app.Run();
 }
@@ -72,5 +56,3 @@ finally
 {
     Log.CloseAndFlush();
 }
-
-

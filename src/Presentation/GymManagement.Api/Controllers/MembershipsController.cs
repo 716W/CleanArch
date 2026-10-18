@@ -1,5 +1,5 @@
-using AutoMapper;
 using GymManagement.Application.Features.Memberships.Commands.CreateMemberships;
+using GymManagement.Application.Features.Memberships.DTOs;
 using GymManagement.Application.Features.Memberships.Queries.GetMembershipById;
 using GymManagement.Application.Features.Memberships.Queries.GetMembershipsByMember;
 using MediatR;
@@ -8,7 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace GymManagement.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/memberships")]
+[Produces("application/json")]
 public class MembershipsController : ControllerBase
 {
     private readonly ISender _sender;
@@ -19,27 +20,30 @@ public class MembershipsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(
+    [ProducesResponseType(typeof(MembershipResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<MembershipResponse>> Create(
         [FromBody] CreateMembershipCommand command,
-        CancellationToken cancellationToken
-    )
+        CancellationToken cancellationToken)
     {
         var result = await _sender.Send(
             command,
-            cancellationToken
-        );
+            cancellationToken);
 
         return CreatedAtAction(
             nameof(GetById),
             new { id = result.Id },
-            result
-        );
+            result);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(
-    Guid id,
-    CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(MembershipResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MembershipResponse>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var result = await _sender.Send(
             new GetMembershipByIdQuery(id),
@@ -49,9 +53,11 @@ public class MembershipsController : ControllerBase
     }
 
     [HttpGet("member/{memberId:guid}")]
-    public async Task<IActionResult> GetByMemberId(
-    Guid memberId,
-    CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(IReadOnlyList<MembershipResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<MembershipResponse>>> GetByMemberId(
+        [FromRoute] Guid memberId,
+        CancellationToken cancellationToken)
     {
         var result = await _sender.Send(
             new GetMembershipsByMemberQuery(memberId),
