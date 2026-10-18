@@ -4,10 +4,9 @@ using MediatR;
 namespace GymManagement.Application.Features.Members.Commands.UpdateMember;
 
 public record UpdateMemberCommand(
-    Guid id,
+    Guid Id,
     string FirstName,
     string LastName,
     string Email,
     DateTime DateOfBirth
-) : IRequest<MemberResponse?>
-{ }
+) : IRequest<MemberResponse>;

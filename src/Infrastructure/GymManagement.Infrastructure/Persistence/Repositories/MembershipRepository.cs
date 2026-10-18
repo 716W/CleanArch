@@ -18,7 +18,7 @@ public class MembershipRepository : IMembershipRepository
     public async Task<Membership> AddAsync(Membership membership, CancellationToken ct = default)
     {
         await _context.Memberships.AddAsync(membership, ct);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
         return membership;
     }

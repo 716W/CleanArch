@@ -43,13 +43,11 @@ public class MembershipPlansController(ISender sender) : ControllerBase
     /// <summary>Returns a single membership plan by its ID.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(MembershipPlanResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MembershipPlanResponse>> GetById(
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        // Handler throws KeyNotFoundException when not found.
-        // Global exception handling (added in the next task) will map this to 404.
         var plan = await sender.Send(new GetMembershipPlanByIdQuery(id), ct);
 
         return Ok(plan);
@@ -58,8 +56,8 @@ public class MembershipPlansController(ISender sender) : ControllerBase
     /// <summary>Updates an existing membership plan. IsActive is not affected by this endpoint.</summary>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(MembershipPlanResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MembershipPlanResponse>> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateMembershipPlanCommand command,
@@ -73,24 +71,18 @@ public class MembershipPlansController(ISender sender) : ControllerBase
 
         var plan = await sender.Send(command, ct);
 
-        if (plan is null)
-            return NotFound();
-
         return Ok(plan);
     }
 
     /// <summary>Activates a membership plan so it can be subscribed to.</summary>
     [HttpPatch("{id:guid}/activate")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Activate(
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var success = await sender.Send(new ActivateMembershipPlanCommand(id), ct);
-
-        if (!success)
-            return NotFound();
+        await sender.Send(new ActivateMembershipPlanCommand(id), ct);
 
         return NoContent();
     }
@@ -98,15 +90,12 @@ public class MembershipPlansController(ISender sender) : ControllerBase
     /// <summary>Deactivates a membership plan. Existing membership records are preserved.</summary>
     [HttpPatch("{id:guid}/deactivate")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Deactivate(
         [FromRoute] Guid id,
         CancellationToken ct)
     {
-        var success = await sender.Send(new DeactivateMembershipPlanCommand(id), ct);
-
-        if (!success)
-            return NotFound();
+        await sender.Send(new DeactivateMembershipPlanCommand(id), ct);
 
         return NoContent();
     }
