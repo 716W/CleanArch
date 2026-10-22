@@ -1,4 +1,5 @@
 using AutoMapper;
+using GymManagement.Application.Exceptions;
 using GymManagement.Application.Features.Members.Commands.CreateMember;
 using GymManagement.Application.Features.Members.DTOs;
 using GymManagement.Application.Mapping;
@@ -85,5 +86,30 @@ public class CreateMemberCommandHandlerTests
                     m.Id != Guid.Empty),
                 cancellationToken),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmailAlreadyExists_ThrowsConflictException()
+    {
+        // Arrange: "ali@example.com" already exists in MockMemberRepository
+        var handler = new CreateMemberCommandHandler(
+            _mockMemberRepository.Mock.Object,
+            _mapper);
+
+        var command = new CreateMemberCommand(
+            "Ali",
+            "Duplicate",
+            "ali@example.com",
+            new DateTime(1995, 1, 1));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ConflictException>(
+            () => handler.Handle(command, CancellationToken.None));
+
+        Assert.Equal("A member with email 'ali@example.com' already exists.", exception.Message);
+
+        _mockMemberRepository.Mock.Verify(
+            repo => repo.AddAsync(It.IsAny<Member>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

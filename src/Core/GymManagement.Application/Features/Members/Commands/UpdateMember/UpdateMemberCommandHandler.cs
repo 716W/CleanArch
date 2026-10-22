@@ -26,6 +26,16 @@ public class UpdateMemberCommandHandler : IRequestHandler<UpdateMemberCommand, M
         if (member is null)
             throw new NotFoundException($"Member with id '{request.Id}' was not found.");
 
+        var emailExists = await _memberRepository.ExistsByEmailAsync(
+            request.Email,
+            excludeMemberId: request.Id,
+            cancellationToken: cancellationToken);
+
+        if (emailExists)
+        {
+            throw new ConflictException($"A member with email '{request.Email}' already exists.");
+        }
+
         member.FirstName = request.FirstName;
         member.LastName = request.LastName;
         member.Email = request.Email;
