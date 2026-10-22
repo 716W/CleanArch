@@ -120,4 +120,67 @@ public class UpdateMemberCommandHandlerTests
             repo => repo.UpdateAsync(It.IsAny<Member>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_DuplicateEmailBelongingToAnotherMember_ThrowsConflictException()
+    {
+        // Arrange
+        var handler = new UpdateMemberCommandHandler(
+            _mockMemberRepository.Mock.Object,
+            _mapper);
+
+        var memberId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var anotherMemberEmail = "inactive@example.com"; // Belongs to 22222222-...
+
+        var command = new UpdateMemberCommand(
+            memberId,
+            "Ali",
+            "Updated",
+            anotherMemberEmail,
+            new DateTime(2000, 1, 1));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ConflictException>(
+            () => handler.Handle(command, CancellationToken.None));
+
+        Assert.Equal($"A member with email '{anotherMemberEmail}' already exists.", exception.Message);
+
+        _mockMemberRepository.Mock.Verify(
+            repo => repo.UpdateAsync(It.IsAny<Member>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_RetainingOwnEmail_ShouldSucceed()
+    {
+        // Arrange
+        var handler = new UpdateMemberCommandHandler(
+            _mockMemberRepository.Mock.Object,
+            _mapper);
+
+        var memberId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var ownEmail = "ali@example.com";
+
+        var command = new UpdateMemberCommand(
+            memberId,
+            "AliNewName",
+            "Test",
+            ownEmail,
+            new DateTime(2000, 1, 1));
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(memberId, result.Id);
+        Assert.Equal("AliNewName", result.FirstName);
+        Assert.Equal(ownEmail, result.Email);
+
+        _mockMemberRepository.Mock.Verify(
+            repo => repo.UpdateAsync(
+                It.Is<Member>(m => m.Id == memberId && m.Email == ownEmail && m.FirstName == "AliNewName"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }

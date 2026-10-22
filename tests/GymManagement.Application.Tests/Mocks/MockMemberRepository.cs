@@ -43,6 +43,13 @@ public class MockMemberRepository
             .ReturnsAsync((Guid id, CancellationToken _) =>
                 members.FirstOrDefault(m => m.Id == id));
 
+        Mock.Setup(r => r.ExistsByEmailAsync(
+                It.IsAny<string>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string email, Guid? excludeMemberId, CancellationToken _) =>
+                members.Any(m => m.Email == email && (!excludeMemberId.HasValue || m.Id != excludeMemberId.Value)));
+
         Mock.Setup(r => r.AddAsync(
                 It.IsAny<Member>(),
                 It.IsAny<CancellationToken>()))
