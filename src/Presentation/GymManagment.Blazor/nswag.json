@@ -1,0 +1,19 @@
+{
+    "runtime": "Net100",
+    "documentGenerator": {
+        "fromDocument": {
+            "url": "http://localhost:5062/swagger/v1/swagger.json"
+        }
+    },
+    "codeGenerators": {
+        "openApiToCSharpClient": {
+            "className": "{controller}Client",
+            "namespace": "GymManagement.Blazor.Services",
+            "generateClientClasses": true,
+            "generateClientInterfaces": true,
+            "injectHttpClient": true,
+            "disposeHttpClient": false,
+            "output": "Services/ApiClient.cs"
+        }
+    }
+}
