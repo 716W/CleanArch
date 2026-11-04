@@ -1,10 +1,38 @@
+## Build and binary outputs
 **/bin/
 **/obj/
-*.user
-*.suo
-.vs/
+**/out/
 
-# Local development database
+## Visual Studio & IDEs
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+*.rsuser
+
+## Test results and coverage
+TestResults/
+[Tt]est[Rr]esult*/
+coverage/
+coverage*.json
+coverage*.xml
+*.VisualState.xml
+TestResult.xml
+
+## Logs
+*.log
+[Bb]uild[Ll]og.*
+
+## Local development database
 *.db
 *.db-shm
 *.db-wal
+
+## OS generated files
+.DS_Store
+Thumbs.db
