@@ -30,6 +30,18 @@ try
     builder.Services.AddProblemDetails();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
+    // Add CORS for Blazor WebAssembly development origins
+    const string blazorCorsPolicy = "BlazorWasmPolicy";
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy(blazorCorsPolicy, policy =>
+        {
+            policy.WithOrigins("http://localhost:5183", "https://localhost:7246")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+    });
+
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
@@ -41,6 +53,8 @@ try
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+
+    app.UseCors(blazorCorsPolicy);
 
     app.UseHttpsRedirection();
 
@@ -56,3 +70,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program { }

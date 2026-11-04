@@ -24,6 +24,18 @@ public class MemberRepository : IMemberRepository
         return await _context.Members.AsNoTracking().ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> ExistsByEmailAsync(string email, Guid? excludeMemberId = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.Members.AsNoTracking().Where(m => m.Email == email);
+
+        if (excludeMemberId.HasValue)
+        {
+            query = query.Where(m => m.Id != excludeMemberId.Value);
+        }
+
+        return await query.AnyAsync(cancellationToken);
+    }
+
     public async Task<Member> AddAsync(Member member, CancellationToken cancellationToken = default)
     {
         await _context.Members.AddAsync(member, cancellationToken);

@@ -11,13 +11,13 @@ namespace GymManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Route("api/members")]
 [Produces("application/json")]
 public class MemberController(ISender sender) : ControllerBase
 {
     [HttpPost]
     [ProducesResponseType(typeof(MemberResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<MemberResponse>> Create(
         [FromBody] CreateMemberCommand command,
         CancellationToken ct)
@@ -53,6 +53,7 @@ public class MemberController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(MemberResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<MemberResponse>> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateMemberCommand command,

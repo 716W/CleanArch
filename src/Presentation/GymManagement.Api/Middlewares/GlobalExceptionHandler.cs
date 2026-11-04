@@ -3,6 +3,8 @@ using FluentValidation;
 using GymManagement.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymManagement.Api.Middlewares;
 
@@ -98,6 +100,23 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 break;
             }
 
+            case DbUpdateException dbUpdateException when IsUniqueConstraintViolation(dbUpdateException):
+            {
+                _logger.LogWarning(
+                    dbUpdateException,
+                    "A unique constraint violation occurred while processing the request. TraceId: {TraceId}",
+                    traceId);
+
+                problemDetails = new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Conflict",
+                    Detail = "A resource with the specified unique value already exists.",
+                    Instance = httpContext.Request.Path
+                };
+                break;
+            }
+
             case BadHttpRequestException badHttpRequestException:
             {
                 problemDetails = new ProblemDetails
@@ -152,5 +171,16 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(problemDetails, problemDetails.GetType(), cancellationToken: cancellationToken);
 
         return true;
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is SqliteException sqliteEx)
+        {
+            return sqliteEx.SqliteExtendedErrorCode == 2067
+                || (sqliteEx.SqliteErrorCode == 19 && sqliteEx.Message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return false;
     }
 }
