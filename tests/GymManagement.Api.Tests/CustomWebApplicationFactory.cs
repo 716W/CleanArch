@@ -1,4 +1,5 @@
 
+using GymManagement.Identity.Context;
 using GymManagement.Infrastructure.Persistence.Context;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,9 +19,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<GymDbContext>>();
+            services.RemoveAll<DbContextOptions<GymIdentityDbContext>>();
 
             services.AddDbContext<GymDbContext>(options =>
                 options.UseSqlite("Data Source=gymmanagement_test.db"));
+
+            services.AddDbContext<GymIdentityDbContext>(options =>
+                options.UseSqlite(
+                    "Data Source=gymmanagement_test.db",
+                    b => b.MigrationsHistoryTable("__EFMigrationsHistory_Identity")));
         });
     }
 
@@ -32,9 +39,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         var dbContext = scope.ServiceProvider
             .GetRequiredService<GymDbContext>();
+        var identityContext = scope.ServiceProvider
+            .GetRequiredService<GymIdentityDbContext>();
 
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.MigrateAsync();
+        await identityContext.Database.MigrateAsync();
     }
 
     public async Task ResetDatabaseAsync()
@@ -45,8 +55,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         var dbContext = scope.ServiceProvider
             .GetRequiredService<GymDbContext>();
+        var identityContext = scope.ServiceProvider
+            .GetRequiredService<GymIdentityDbContext>();
 
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.MigrateAsync();
+        await identityContext.Database.MigrateAsync();
     }
 }
