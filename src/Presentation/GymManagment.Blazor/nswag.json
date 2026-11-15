@@ -13,6 +13,7 @@
       "generateClientInterfaces": true,
       "injectHttpClient": true,
       "disposeHttpClient": false,
+      "jsonLibrary": "SystemTextJson",
       "output": "Generated/ApiClient.cs"
     }
   }

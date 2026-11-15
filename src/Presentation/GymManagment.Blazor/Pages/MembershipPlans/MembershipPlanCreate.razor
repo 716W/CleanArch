@@ -1,0 +1,205 @@
+@page "/membership-plans/create"
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="plan-create-page" style="max-width: 680px;">
+    <div class="mb-3">
+        <a href="membership-plans" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Plans
+        </a>
+    </div>
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" />
+    }
+
+    <div class="gym-card">
+        <div class="gym-card-header">
+            <div>
+                <h2 class="gym-card-title">Create Membership Plan</h2>
+                <div class="gym-card-subtitle">Configure pricing, duration, and freeze allowances</div>
+            </div>
+        </div>
+
+        <div class="gym-card-body">
+            <form @onsubmit="HandleSubmitAsync" @onsubmit:preventDefault="true">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <FormField Label="Plan Name"
+                                   IsRequired="true"
+                                   Hint="A descriptive tier name (e.g. 'Standard Monthly', 'Gold Annual')"
+                                   Error="@GetFieldError("Name")">
+                            <input type="text"
+                                   class="gym-input @(HasFieldError("Name") ? "gym-input-error" : "")"
+                                   placeholder="e.g. Standard 30-Day Plan"
+                                   @bind="_command.Name"
+                                   disabled="@_isSaving" />
+                        </FormField>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <FormField Label="Plan Duration"
+                                   IsRequired="true"
+                                   Hint="Length of membership subscription"
+                                   Error="@GetFieldError("DurationInDays")">
+                            <select class="gym-select @(HasFieldError("DurationInDays") ? "gym-input-error" : "")"
+                                    @bind="_command.DurationInDays"
+                                    disabled="@_isSaving">
+                                <option value="1">1 Day (Single Day Pass)</option>
+                                <option value="7">7 Days (1 Week Pass)</option>
+                                <option value="14">14 Days (2 Weeks Pass)</option>
+                                <option value="30">30 Days (1 Month Subscription)</option>
+                                <option value="90">90 Days (3 Months Quarterly)</option>
+                                <option value="180">180 Days (6 Months Semi-Annual)</option>
+                                <option value="365">365 Days (1 Year Annual)</option>
+                            </select>
+                        </FormField>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <FormField Label="Price ($ USD)"
+                                   IsRequired="true"
+                                   Hint="Total cost for the duration (>= $0.00)"
+                                   Error="@GetFieldError("Price")">
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   class="gym-input @(HasFieldError("Price") ? "gym-input-error" : "")"
+                                   placeholder="e.g. 49.99"
+                                   @bind="_command.Price"
+                                   disabled="@_isSaving" />
+                        </FormField>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <FormField Label="Max Freeze Days"
+                                   IsRequired="true"
+                                   Hint="Max paused days allowed (>= 0)"
+                                   Error="@GetFieldError("MaxFreezeDays")">
+                            <input type="number"
+                                   min="0"
+                                   class="gym-input @(HasFieldError("MaxFreezeDays") ? "gym-input-error" : "")"
+                                   placeholder="0"
+                                   @bind="_command.MaxFreezeDays"
+                                   disabled="@_isSaving" />
+                        </FormField>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <FormField Label="Display Order"
+                                   IsRequired="true"
+                                   Hint="Sort order in the list (0 = top)"
+                                   Error="@GetFieldError("DisplayOrder")">
+                            <input type="number"
+                                   min="0"
+                                   class="gym-input @(HasFieldError("DisplayOrder") ? "gym-input-error" : "")"
+                                   placeholder="0"
+                                   @bind="_command.DisplayOrder"
+                                   disabled="@_isSaving" />
+                        </FormField>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="membership-plans" class="btn-gym btn-gym-secondary" disabled="@_isSaving">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn-gym btn-gym-primary" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span>Creating Plan...</span>
+                        }
+                        else
+                        {
+                            <Icons Name="check" Size="16" />
+                            <span>Save & Create Plan</span>
+                        }
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateMembershipPlanCommand _command = new()
+    {
+        DurationInDays = 30,
+        Price = 49.99,
+        MaxFreezeDays = 7,
+        DisplayOrder = 1
+    };
+
+    private bool _isSaving;
+    private GymManagementApiException? _apiException;
+    private Dictionary<string, string> _clientErrors = new();
+
+    private bool HasFieldError(string fieldName) =>
+        _clientErrors.ContainsKey(fieldName) ||
+        (_apiException?.ValidationErrors != null && _apiException.ValidationErrors.ContainsKey(fieldName));
+
+    private string? GetFieldError(string fieldName)
+    {
+        if (_clientErrors.TryGetValue(fieldName, out var clientErr))
+            return clientErr;
+
+        if (_apiException?.ValidationErrors != null &&
+            _apiException.ValidationErrors.TryGetValue(fieldName, out var apiErrors))
+        {
+            return string.Join(" ", apiErrors);
+        }
+
+        return null;
+    }
+
+    private bool ValidateClient()
+    {
+        _clientErrors.Clear();
+
+        if (string.IsNullOrWhiteSpace(_command.Name))
+            _clientErrors["Name"] = "Plan name is required.";
+        else if (_command.Name.Length > 100)
+            _clientErrors["Name"] = "Plan name must not exceed 100 characters.";
+
+        int[] allowed = [1, 7, 14, 30, 90, 180, 365];
+        if (!allowed.Contains(_command.DurationInDays))
+            _clientErrors["DurationInDays"] = $"Duration must be one of: {string.Join(", ", allowed)}.";
+
+        if (_command.Price < 0)
+            _clientErrors["Price"] = "Price must be greater than or equal to 0.";
+
+        if (_command.MaxFreezeDays < 0)
+            _clientErrors["MaxFreezeDays"] = "Max freeze days cannot be negative.";
+
+        if (_command.DisplayOrder < 0)
+            _clientErrors["DisplayOrder"] = "Display order cannot be negative.";
+
+        return _clientErrors.Count == 0;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _apiException = null;
+
+        if (!ValidateClient())
+            return;
+
+        _isSaving = true;
+        try
+        {
+            var created = await MembershipPlanService.CreateAsync(_command);
+            Navigation.NavigateTo($"membership-plans/{created.Id}");
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}
+

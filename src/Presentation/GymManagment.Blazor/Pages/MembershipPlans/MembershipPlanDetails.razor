@@ -1,0 +1,240 @@
+@page "/membership-plans/{Id:guid}"
+@implements IDisposable
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="plan-details-page" style="max-width: 800px;">
+    <div class="mb-3">
+        <a href="membership-plans" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Plans
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="gym-alert gym-alert-success mb-3" role="alert">
+            <Icons Name="check" Size="18" Class="text-success flex-shrink-0" />
+            <div class="gym-alert-body">
+                <div>@_successMessage</div>
+            </div>
+            <button type="button" class="btn-close ms-auto" @onclick="() => _successMessage = null" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" OnRetry="LoadPlanAsync" />
+    }
+
+    @if (_isLoading)
+    {
+        <LoadingIndicator Message="Loading plan specifications..." />
+    }
+    else if (_plan != null)
+    {
+        <div class="gym-card">
+            <div class="gym-card-header">
+                <div>
+                    <h2 class="gym-card-title">@_plan.Name</h2>
+                    <div class="gym-card-subtitle">Plan configuration details</div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <StatusBadge IsActive="@_plan.IsActive" />
+                    <a href="membership-plans/@_plan.Id/edit" class="btn-gym btn-gym-secondary btn-gym-sm">
+                        <Icons Name="edit" Size="14" /> Edit
+                    </a>
+                    @if (_plan.IsActive)
+                    {
+                        <button type="button"
+                                class="btn-gym btn-gym-secondary btn-gym-sm"
+                                @onclick="() => PromptStatusChange(false)">
+                            Deactivate Plan
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button"
+                                class="btn-gym btn-gym-success btn-gym-sm"
+                                @onclick="() => PromptStatusChange(true)">
+                            Activate Plan
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="gym-card-body">
+                <div class="detail-grid">
+                    <div>
+                        <div class="detail-item-label">Plan Name</div>
+                        <div class="detail-item-value">@_plan.Name</div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Subscription Price</div>
+                        <div class="detail-item-value text-primary fw-bold" style="font-size: 1.125rem;">
+                            $@_plan.Price.ToString("N2")
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Validity Duration</div>
+                        <div class="detail-item-value">
+                            @FormatDuration(_plan.DurationInDays)
+                            <span class="text-muted" style="font-size: 0.8125rem;">(@_plan.DurationInDays calendar days)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Maximum Freeze Days</div>
+                        <div class="detail-item-value">@_plan.MaxFreezeDays days allowable</div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Display Order</div>
+                        <div class="detail-item-value">#@_plan.DisplayOrder</div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Enrollment Availability</div>
+                        <div class="detail-item-value">
+                            @if (_plan.IsActive)
+                            {
+                                <span class="text-success fw-semibold">Available for new members</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted fw-semibold">Archived (Deactivated)</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gym-card-footer justify-content-between">
+                <span class="text-muted" style="font-size: 0.75rem;">Plan ID: @_plan.Id</span>
+                @if (_plan.IsActive)
+                {
+                    <a href="memberships/create" class="btn-gym btn-gym-primary btn-gym-sm">
+                        <Icons Name="plus" Size="14" /> Assign This Plan
+                    </a>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<ConfirmDialog IsOpen="_statusDialogOpen"
+               Title="@(_activateAction ? "Activate Membership Plan" : "Deactivate Membership Plan")"
+               Message="@(_activateAction
+                   ? $"Activate plan '{_plan?.Name}'? Members will immediately be able to subscribe to this plan."
+                   : $"Deactivate plan '{_plan?.Name}'? New subscriptions will be blocked. Existing members are not affected.")"
+               ConfirmText="@(_activateAction ? "Activate" : "Deactivate")"
+               IsDestructive="@(!_activateAction)"
+               IsBusy="_isTogglingStatus"
+               OnConfirm="ConfirmStatusChangeAsync"
+               OnCancel="() => _statusDialogOpen = false" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isTogglingStatus;
+    private GymManagementApiException? _apiException;
+    private string? _successMessage;
+
+    private MembershipPlanResponse? _plan;
+    private bool _statusDialogOpen;
+    private bool _activateAction;
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPlanAsync();
+    }
+
+    private async Task LoadPlanAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            _plan = await MembershipPlanService.GetByIdAsync(Id, _cts.Token);
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void PromptStatusChange(bool activate)
+    {
+        _activateAction = activate;
+        _statusDialogOpen = true;
+    }
+
+    private async Task ConfirmStatusChangeAsync()
+    {
+        if (_plan == null) return;
+        _isTogglingStatus = true;
+
+        try
+        {
+            if (_activateAction)
+            {
+                await MembershipPlanService.ActivateAsync(_plan.Id);
+                _plan.IsActive = true;
+                _successMessage = $"Plan '{_plan.Name}' was successfully activated.";
+            }
+            else
+            {
+                await MembershipPlanService.DeactivateAsync(_plan.Id);
+                _plan.IsActive = false;
+                _successMessage = $"Plan '{_plan.Name}' was deactivated.";
+            }
+
+            _statusDialogOpen = false;
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+            _statusDialogOpen = false;
+        }
+        finally
+        {
+            _isTogglingStatus = false;
+        }
+    }
+
+    private static string FormatDuration(int days) => days switch
+    {
+        1 => "1 Day",
+        7 => "7 Days (1 Week)",
+        14 => "14 Days (2 Weeks)",
+        30 => "30 Days (1 Month)",
+        90 => "90 Days (3 Months)",
+        180 => "180 Days (6 Months)",
+        365 => "365 Days (1 Year)",
+        _ => $"{days} Days"
+    };
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

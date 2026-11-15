@@ -1,0 +1,277 @@
+@page "/"
+@page "/dashboard"
+@implements IDisposable
+@inject IMemberService MemberService
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="dashboard-container">
+    @if (_isLoading)
+    {
+        <LoadingIndicator Message="Loading dashboard metrics..." />
+    }
+    else if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" OnRetry="LoadDashboardDataAsync" />
+    }
+    else
+    {
+        <!-- KPI Metric Cards Grid -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <StatCard Label="Total Members"
+                          Value="@_totalMembers.ToString("N0")"
+                          Icon="members"
+                          Subtext="@($"{_activeMembers} active • {_inactiveMembers} inactive")" />
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <StatCard Label="Active Members"
+                          Value="@_activeMembers.ToString("N0")"
+                          Icon="check"
+                          Subtext="@(_totalMembers > 0 ? $"{((double)_activeMembers / _totalMembers * 100):F0}% retention rate" : "No registered members")" />
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <StatCard Label="Membership Plans"
+                          Value="@_totalPlans.ToString("N0")"
+                          Icon="plans"
+                          Subtext="@($"{_activePlans} available for new signups")" />
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <StatCard Label="Monthly Revenue"
+                          Icon="dollar"
+                          IsUnavailable="true"
+                          UnavailableReason="Billing / telemetry not in API"
+                          Subtext="Payments API not integrated" />
+            </div>
+        </div>
+
+        <!-- Quick Actions Row -->
+        <div class="gym-card mb-4">
+            <div class="gym-card-header">
+                <div>
+                    <h2 class="gym-card-title">Quick Actions</h2>
+                    <div class="gym-card-subtitle">Common operations and shortcuts</div>
+                </div>
+            </div>
+            <div class="gym-card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="members/create" class="btn-gym btn-gym-primary">
+                        <Icons Name="plus" Size="16" /> Register Member
+                    </a>
+                    <a href="membership-plans/create" class="btn-gym btn-gym-secondary">
+                        <Icons Name="plus" Size="16" /> Create Plan
+                    </a>
+                    <a href="memberships/create" class="btn-gym btn-gym-secondary">
+                        <Icons Name="id-card" Size="16" /> Assign Membership
+                    </a>
+                    <button type="button" class="btn-gym btn-gym-secondary ms-auto" @onclick="LoadDashboardDataAsync">
+                        <Icons Name="refresh" Size="16" /> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Recent Members Table -->
+            <div class="col-12 col-lg-7">
+                <div class="gym-card h-100 mb-0">
+                    <div class="gym-card-header">
+                        <div>
+                            <h2 class="gym-card-title">Recently Joined Members</h2>
+                            <div class="gym-card-subtitle">Latest member registrations</div>
+                        </div>
+                        <a href="members" class="btn-gym btn-gym-secondary btn-gym-sm">
+                            View All (@_totalMembers)
+                        </a>
+                    </div>
+                    <div class="gym-card-body p-0">
+                        @if (_recentMembers.Count == 0)
+                        {
+                            <div class="p-4">
+                                <EmptyState Icon="members"
+                                            Title="No Members Yet"
+                                            Description="Register your first gym member to see them listed here.">
+                                    <ActionButton>
+                                        <a href="members/create" class="btn-gym btn-gym-primary btn-gym-sm">
+                                            Register Member
+                                        </a>
+                                    </ActionButton>
+                                </EmptyState>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="gym-table-container">
+                                <table class="gym-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Joined Date</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var member in _recentMembers)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold text-dark">
+                                                    @member.FirstName @member.LastName
+                                                </td>
+                                                <td class="text-muted">@member.Email</td>
+                                                <td>@member.JoinedDate.ToString("MMM d, yyyy")</td>
+                                                <td><StatusBadge IsActive="@member.IsActive" /></td>
+                                                <td class="text-end">
+                                                    <a href="members/@member.Id" class="btn-gym btn-gym-secondary btn-gym-sm" title="View details">
+                                                        Details
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Membership Plans -->
+            <div class="col-12 col-lg-5">
+                <div class="gym-card h-100 mb-0">
+                    <div class="gym-card-header">
+                        <div>
+                            <h2 class="gym-card-title">Available Membership Plans</h2>
+                            <div class="gym-card-subtitle">Active subscription tiers</div>
+                        </div>
+                        <a href="membership-plans" class="btn-gym btn-gym-secondary btn-gym-sm">
+                            Manage
+                        </a>
+                    </div>
+                    <div class="gym-card-body p-0">
+                        @if (_activePlansList.Count == 0)
+                        {
+                            <div class="p-4">
+                                <EmptyState Icon="plans"
+                                            Title="No Active Plans"
+                                            Description="Create an active plan to start offering memberships.">
+                                    <ActionButton>
+                                        <a href="membership-plans/create" class="btn-gym btn-gym-primary btn-gym-sm">
+                                            Create Plan
+                                        </a>
+                                    </ActionButton>
+                                </EmptyState>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var plan in _activePlansList)
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-bottom">
+                                        <div>
+                                            <div class="fw-semibold text-dark">@plan.Name</div>
+                                            <div class="text-muted" style="font-size: 0.75rem;">
+                                                @plan.DurationInDays days duration • Up to @plan.MaxFreezeDays freeze days
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                                $@plan.Price.ToString("N2")
+                                            </div>
+                                            <a href="membership-plans/@plan.Id" class="text-muted text-decoration-none" style="font-size: 0.75rem;">
+                                                Details &rarr;
+                                            </a>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private GymManagementApiException? _apiException;
+    private CancellationTokenSource _cts = new();
+
+    private int _totalMembers;
+    private int _activeMembers;
+    private int _inactiveMembers;
+    private int _totalPlans;
+    private int _activePlans;
+
+    private List<MemberResponse> _recentMembers = new();
+    private List<MembershipPlanResponse> _activePlansList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var membersTask = MemberService.GetAllAsync(_cts.Token);
+            var plansTask = MembershipPlanService.GetAllAsync(activeOnly: null, _cts.Token);
+
+            await Task.WhenAll(membersTask, plansTask);
+
+            var members = await membersTask;
+            var plans = await plansTask;
+
+            _totalMembers = members.Count;
+            _activeMembers = members.Count(m => m.IsActive);
+            _inactiveMembers = members.Count(m => !m.IsActive);
+
+            _totalPlans = plans.Count;
+            _activePlans = plans.Count(p => p.IsActive);
+
+            _recentMembers = members
+                .OrderByDescending(m => m.JoinedDate)
+                .Take(5)
+                .ToList();
+
+            _activePlansList = plans
+                .Where(p => p.IsActive)
+                .OrderBy(p => p.DisplayOrder)
+                .Take(5)
+                .ToList();
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

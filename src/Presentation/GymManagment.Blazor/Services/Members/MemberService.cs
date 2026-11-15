@@ -30,7 +30,7 @@ public sealed class MemberService : BaseApiService, IMemberService
         CancellationToken cancellationToken = default)
     {
         var result = await ExecuteAsync(
-            () => _client.MemberAllAsync(cancellationToken));
+            () => _client.MembersAllAsync(cancellationToken));
 
         // NSwag generates ICollection<T>; we expose the more restrictive IReadOnlyList<T>.
         return result.ToList().AsReadOnly();
@@ -40,25 +40,25 @@ public sealed class MemberService : BaseApiService, IMemberService
     public Task<MemberResponse> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
-        => ExecuteAsync(() => _client.MemberGETAsync(id, cancellationToken));
+        => ExecuteAsync(() => _client.MembersGETAsync(id, cancellationToken));
 
     /// <inheritdoc />
     public Task<MemberResponse> CreateAsync(
         CreateMemberCommand command,
         CancellationToken cancellationToken = default)
-        => ExecuteAsync(() => _client.MemberPOSTAsync(command, cancellationToken));
+        => ExecuteAsync(() => _client.MembersPOSTAsync(command, cancellationToken));
 
     /// <inheritdoc />
     public Task<MemberResponse> UpdateAsync(
         Guid id,
         UpdateMemberCommand command,
         CancellationToken cancellationToken = default)
-        => ExecuteAsync(() => _client.MemberPUTAsync(id, command, cancellationToken));
+        => ExecuteAsync(() => _client.MembersPUTAsync(id, command, cancellationToken));
 
     /// <inheritdoc />
     public Task DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default)
-        => ExecuteAsync(() => _client.MemberDELETEAsync(id, cancellationToken));
+        => ExecuteAsync(() => _client.MembersDELETEAsync(id, cancellationToken));
 }
 

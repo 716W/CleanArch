@@ -1,0 +1,42 @@
+<span class="gym-badge @BadgeCssClass">
+    @DisplayText
+</span>
+
+@code {
+    [Parameter] public bool? IsActive { get; set; }
+    [Parameter] public string? Status { get; set; }
+
+    private string DisplayText
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(Status))
+            {
+                return Status;
+            }
+
+            if (IsActive.HasValue)
+            {
+                return IsActive.Value ? "Active" : "Inactive";
+            }
+
+            return "Unknown";
+        }
+    }
+
+    private string BadgeCssClass
+    {
+        get
+        {
+            var text = DisplayText.Trim().ToLowerInvariant();
+            return text switch
+            {
+                "active" => "gym-badge-active",
+                "frozen" => "gym-badge-frozen",
+                "expired" => "gym-badge-expired",
+                _ => "gym-badge-inactive"
+            };
+        }
+    }
+}
+

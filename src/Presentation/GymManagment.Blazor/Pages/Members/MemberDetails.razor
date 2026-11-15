@@ -1,0 +1,287 @@
+@page "/members/{Id:guid}"
+@implements IDisposable
+@inject IMemberService MemberService
+@inject IMembershipService MembershipService
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="member-details-page">
+    <div class="mb-3">
+        <a href="members" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Members
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="gym-alert gym-alert-success mb-3" role="alert">
+            <Icons Name="check" Size="18" Class="text-success flex-shrink-0" />
+            <div class="gym-alert-body">
+                <div>@_successMessage</div>
+            </div>
+            <button type="button" class="btn-close ms-auto" @onclick="() => _successMessage = null" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" OnRetry="LoadMemberDetailsAsync" />
+    }
+
+    @if (_isLoading)
+    {
+        <LoadingIndicator Message="Loading member profile..." />
+    }
+    else if (_member != null)
+    {
+        <!-- Member Summary Card -->
+        <div class="gym-card mb-4">
+            <div class="gym-card-header">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="brand-icon bg-primary text-white" style="width: 44px; height: 44px; font-weight: 700; font-size: 1.125rem;">
+                        @GetInitials(_member.FirstName, _member.LastName)
+                    </div>
+                    <div>
+                        <h2 class="gym-card-title" style="font-size: 1.125rem;">
+                            @_member.FirstName @_member.LastName
+                        </h2>
+                        <div class="gym-card-subtitle">
+                            Joined @_member.JoinedDate.ToString("MMMM d, yyyy")
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <StatusBadge IsActive="@_member.IsActive" />
+                    <a href="members/@_member.Id/edit" class="btn-gym btn-gym-secondary btn-gym-sm">
+                        <Icons Name="edit" Size="14" /> Edit
+                    </a>
+                    <button type="button" class="btn-gym btn-gym-danger-outline btn-gym-sm" @onclick="PromptDelete">
+                        <Icons Name="trash" Size="14" /> Delete
+                    </button>
+                </div>
+            </div>
+
+            <div class="gym-card-body">
+                <div class="detail-grid">
+                    <div>
+                        <div class="detail-item-label">Full Name</div>
+                        <div class="detail-item-value">@_member.FirstName @_member.LastName</div>
+                    </div>
+                    <div>
+                        <div class="detail-item-label">Email Address</div>
+                        <div class="detail-item-value">@_member.Email</div>
+                    </div>
+                    <div>
+                        <div class="detail-item-label">Date of Birth</div>
+                        <div class="detail-item-value">
+                            @_member.DateOfBirth.ToString("MMM d, yyyy")
+                            <span class="text-muted" style="font-size: 0.8125rem;">(@GetAge(_member.DateOfBirth) years old)</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="detail-item-label">Account Status</div>
+                        <div class="detail-item-value">
+                            @(_member.IsActive ? "Active Gym Member" : "Inactive / Deactivated")
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memberships Section -->
+        <div class="gym-card">
+            <div class="gym-card-header">
+                <div>
+                    <h3 class="gym-card-title">Membership History</h3>
+                    <div class="gym-card-subtitle">Subscriptions and active plans for this member</div>
+                </div>
+
+                @if (_member.IsActive)
+                {
+                    <a href="memberships/create?memberId=@_member.Id" class="btn-gym btn-gym-primary btn-gym-sm">
+                        <Icons Name="plus" Size="14" /> Assign New Membership
+                    </a>
+                }
+                else
+                {
+                    <span class="text-muted" style="font-size: 0.75rem;">(Inactive members cannot be assigned plans)</span>
+                }
+            </div>
+
+            <div class="gym-card-body p-0">
+                @if (_memberships.Count == 0)
+                {
+                    <div class="p-4">
+                        <EmptyState Icon="id-card"
+                                    Title="No memberships on record"
+                                    Description="This member has not yet been assigned a membership plan.">
+                            <ActionButton>
+                                @if (_member.IsActive)
+                                {
+                                    <a href="memberships/create?memberId=@_member.Id" class="btn-gym btn-gym-primary btn-gym-sm">
+                                        Assign Membership Now
+                                    </a>
+                                }
+                            </ActionButton>
+                        </EmptyState>
+                    </div>
+                }
+                else
+                {
+                    <div class="gym-table-container">
+                        <table class="gym-table">
+                            <thead>
+                                <tr>
+                                    <th>Plan Name</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in _memberships)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold text-dark">
+                                            @GetPlanName(m.MembershipPlanId)
+                                        </td>
+                                        <td>@m.StartDate.ToString("MMM d, yyyy")</td>
+                                        <td>@m.EndDate.ToString("MMM d, yyyy")</td>
+                                        <td><StatusBadge Status="@m.Status" /></td>
+                                        <td class="text-end">
+                                            <a href="memberships/@m.Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+                                                View Subscription
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<ConfirmDialog IsOpen="_deleteDialogOpen"
+               Title="Delete Member"
+               Message="@($"Are you sure you want to permanently delete member '{_member?.FirstName} {_member?.LastName}'? All member history will be removed.")"
+               ConfirmText="Delete"
+               IsDestructive="true"
+               IsBusy="_isDeleting"
+               OnConfirm="ConfirmDeleteAsync"
+               OnCancel="() => _deleteDialogOpen = false" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isDeleting;
+    private GymManagementApiException? _apiException;
+    private string? _successMessage;
+
+    private MemberResponse? _member;
+    private List<MembershipResponse> _memberships = new();
+    private Dictionary<Guid, string> _planNames = new();
+    private bool _deleteDialogOpen;
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadMemberDetailsAsync();
+    }
+
+    private async Task LoadMemberDetailsAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var memberTask = MemberService.GetByIdAsync(Id, _cts.Token);
+            var membershipsTask = MembershipService.GetByMemberIdAsync(Id, _cts.Token);
+            var plansTask = MembershipPlanService.GetAllAsync(activeOnly: null, _cts.Token);
+
+            await Task.WhenAll(memberTask, membershipsTask, plansTask);
+
+            _member = await memberTask;
+            _memberships = (await membershipsTask).OrderByDescending(m => m.StartDate).ToList();
+
+            var plans = await plansTask;
+            _planNames = plans.ToDictionary(p => p.Id, p => p.Name);
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetPlanName(Guid planId)
+    {
+        return _planNames.TryGetValue(planId, out var name) ? name : $"Plan {planId.ToString()[..8]}";
+    }
+
+    private static string GetInitials(string? first, string? last)
+    {
+        var f = !string.IsNullOrWhiteSpace(first) ? first[0].ToString().ToUpperInvariant() : "";
+        var l = !string.IsNullOrWhiteSpace(last) ? last[0].ToString().ToUpperInvariant() : "";
+        return $"{f}{l}";
+    }
+
+    private static int GetAge(DateTimeOffset dob)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - dob.Year;
+        if (dob.Date > today.AddYears(-age)) age--;
+        return Math.Max(0, age);
+    }
+
+    private void PromptDelete()
+    {
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_member == null) return;
+        _isDeleting = true;
+
+        try
+        {
+            await MemberService.DeleteAsync(_member.Id);
+            _deleteDialogOpen = false;
+            Navigation.NavigateTo("members");
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+            _deleteDialogOpen = false;
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

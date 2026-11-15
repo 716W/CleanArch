@@ -1,0 +1,57 @@
+<aside class="app-sidebar @(IsOpen ? "open" : "")">
+    <div class="sidebar-header">
+        <div class="brand-icon">
+            <Icons Name="dumbbell" Size="20" />
+        </div>
+        <div>
+            <div class="brand-title">GymPro</div>
+            <div class="brand-subtitle">Management System</div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section-title">Overview</div>
+        <NavLink class="sidebar-link" href="" Match="NavLinkMatch.All" @onclick="HandleLinkClick">
+            <span class="link-icon"><Icons Name="dashboard" Size="18" /></span>
+            <span>Dashboard</span>
+        </NavLink>
+
+        <div class="nav-section-title">Operations</div>
+        <NavLink class="sidebar-link" href="members" Match="NavLinkMatch.Prefix" @onclick="HandleLinkClick">
+            <span class="link-icon"><Icons Name="members" Size="18" /></span>
+            <span>Members</span>
+        </NavLink>
+
+        <NavLink class="sidebar-link" href="membership-plans" Match="NavLinkMatch.Prefix" @onclick="HandleLinkClick">
+            <span class="link-icon"><Icons Name="plans" Size="18" /></span>
+            <span>Membership Plans</span>
+        </NavLink>
+
+        <NavLink class="sidebar-link" href="memberships" Match="NavLinkMatch.Prefix" @onclick="HandleLinkClick">
+            <span class="link-icon"><Icons Name="memberships" Size="18" /></span>
+            <span>Memberships</span>
+        </NavLink>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="status-indicator" title="Connected to GymManagement API"></div>
+        <div>
+            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary);">System Online</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">API v1.0 (.NET 10)</div>
+        </div>
+    </div>
+</aside>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task HandleLinkClick()
+    {
+        if (IsOpen && OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+}
+

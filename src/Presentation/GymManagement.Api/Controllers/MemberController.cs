@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GymManagement.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/members")]
 [Produces("application/json")]
 public class MemberController(ISender sender) : ControllerBase
 {

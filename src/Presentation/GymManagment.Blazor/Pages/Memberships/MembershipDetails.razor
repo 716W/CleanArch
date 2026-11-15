@@ -1,0 +1,198 @@
+@page "/memberships/{Id:guid}"
+@implements IDisposable
+@inject IMembershipService MembershipService
+@inject IMemberService MemberService
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="membership-details-page" style="max-width: 800px;">
+    <div class="mb-3">
+        <a href="memberships" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Memberships
+        </a>
+    </div>
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" OnRetry="LoadMembershipAsync" />
+    }
+
+    @if (_isLoading)
+    {
+        <LoadingIndicator Message="Loading membership subscription..." />
+    }
+    else if (_membership != null)
+    {
+        <div class="gym-card mb-4">
+            <div class="gym-card-header">
+                <div>
+                    <h2 class="gym-card-title">Membership Subscription</h2>
+                    <div class="gym-card-subtitle">ID: @_membership.Id</div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <StatusBadge Status="@_membership.Status" />
+                </div>
+            </div>
+
+            <div class="gym-card-body">
+                <div class="detail-grid">
+                    <div>
+                        <div class="detail-item-label">Subscriber (Member)</div>
+                        <div class="detail-item-value">
+                            @if (_member != null)
+                            {
+                                <a href="members/@_member.Id" class="text-primary text-decoration-none fw-semibold">
+                                    @_member.FirstName @_member.LastName
+                                </a>
+                                <div class="text-muted" style="font-size: 0.75rem;">@_member.Email</div>
+                            }
+                            else
+                            {
+                                <span>@_membership.MemberId</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Membership Plan</div>
+                        <div class="detail-item-value">
+                            @if (_plan != null)
+                            {
+                                <a href="membership-plans/@_plan.Id" class="text-primary text-decoration-none fw-semibold">
+                                    @_plan.Name
+                                </a>
+                                <div class="text-muted" style="font-size: 0.75rem;">$@_plan.Price.ToString("N2") • @_plan.DurationInDays days</div>
+                            }
+                            else
+                            {
+                                <span>@_membership.MembershipPlanId</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Start Date</div>
+                        <div class="detail-item-value">
+                            @_membership.StartDate.ToString("MMMM d, yyyy")
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">End Date</div>
+                        <div class="detail-item-value">
+                            @_membership.EndDate.ToString("MMMM d, yyyy")
+                            @if (_membership.EndDate < DateTimeOffset.Now)
+                            {
+                                <span class="text-danger" style="font-size: 0.75rem; display: block;">(Expired)</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="detail-item-label">Subscription Status</div>
+                        <div class="detail-item-value">
+                            <StatusBadge Status="@_membership.Status" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gym-card-footer justify-content-between">
+                @if (_member != null)
+                {
+                    <a href="members/@_member.Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+                        <Icons Name="members" Size="14" /> Member Profile
+                    </a>
+                }
+                @if (_plan != null)
+                {
+                    <a href="membership-plans/@_plan.Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+                        <Icons Name="plans" Size="14" /> Plan Details
+                    </a>
+                }
+            </div>
+        </div>
+
+        <div class="gym-alert gym-alert-info">
+            <Icons Name="alert" Size="18" Class="text-primary flex-shrink-0" />
+            <div class="gym-alert-body">
+                <div class="gym-alert-title">Subscription Policy Notice</div>
+                <div style="font-size: 0.8125rem;">
+                    Freezing, renewals, and refunds are subject to plan rules. Operations beyond registration are not currently exposed as standalone API actions in this release.
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private GymManagementApiException? _apiException;
+
+    private MembershipResponse? _membership;
+    private MemberResponse? _member;
+    private MembershipPlanResponse? _plan;
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadMembershipAsync();
+    }
+
+    private async Task LoadMembershipAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            _membership = await MembershipService.GetByIdAsync(Id, _cts.Token);
+
+            if (_membership != null)
+            {
+                try
+                {
+                    _member = await MemberService.GetByIdAsync(_membership.MemberId, _cts.Token);
+                }
+                catch
+                {
+                    // Ignore if member details fail to load
+                }
+
+                try
+                {
+                    _plan = await MembershipPlanService.GetByIdAsync(_membership.MembershipPlanId, _cts.Token);
+                }
+                catch
+                {
+                    // Ignore if plan details fail to load
+                }
+            }
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

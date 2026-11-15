@@ -1,0 +1,55 @@
+@if (Exception != null || !string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Message))
+{
+    <div class="gym-alert gym-alert-danger" role="alert">
+        <Icons Name="alert" Size="20" Class="text-danger flex-shrink-0" />
+        <div class="gym-alert-body">
+            <div class="gym-alert-title">@(DisplayTitle)</div>
+            @if (!string.IsNullOrWhiteSpace(DisplayDetail))
+            {
+                <div>@DisplayDetail</div>
+            }
+
+            @if (ValidationErrors != null && ValidationErrors.Count > 0)
+            {
+                <ul class="mb-0 mt-2 ps-3">
+                    @foreach (var (field, errors) in ValidationErrors)
+                    {
+                        @foreach (var err in errors)
+                        {
+                            <li><strong>@field:</strong> @err</li>
+                        }
+                    }
+                </ul>
+            }
+
+            @if (OnRetry.HasDelegate)
+            {
+                <div class="mt-2">
+                    <button type="button" class="btn-gym btn-gym-sm btn-gym-secondary" @onclick="OnRetry">
+                        <Icons Name="refresh" Size="14" /> Retry
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public GymManagementApiException? Exception { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    private string DisplayTitle =>
+        !string.IsNullOrWhiteSpace(Title) ? Title :
+        Exception != null ? Exception.Title :
+        "Operation Failed";
+
+    private string? DisplayDetail =>
+        !string.IsNullOrWhiteSpace(Message) ? Message :
+        Exception?.Detail;
+
+    private IReadOnlyDictionary<string, ICollection<string>>? ValidationErrors =>
+        Exception?.ValidationErrors;
+}
+

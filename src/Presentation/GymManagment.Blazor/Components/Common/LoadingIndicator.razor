@@ -1,0 +1,14 @@
+<div class="state-container">
+    <div class="spinner" role="status" aria-label="Loading"></div>
+    <div class="state-title">@Message</div>
+    @if (!string.IsNullOrWhiteSpace(SubMessage))
+    {
+        <div class="state-description">@SubMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "Loading data...";
+    [Parameter] public string? SubMessage { get; set; }
+}
+
