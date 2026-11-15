@@ -1,5 +1,6 @@
 using GymManagement.Api.Middlewares;
 using GymManagement.Application;
+using GymManagement.Identity;
 using GymManagement.Infrastructure;
 using Serilog;
 
@@ -21,6 +22,7 @@ try
     // Add services to the container.
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddIdentityServices(builder.Configuration);
 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -57,6 +59,9 @@ try
     app.UseCors(blazorCorsPolicy);
 
     app.UseHttpsRedirection();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.MapControllers();
 
