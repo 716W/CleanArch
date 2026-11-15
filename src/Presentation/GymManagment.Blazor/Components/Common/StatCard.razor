@@ -1,0 +1,33 @@
+<div class="stat-card">
+    <div class="stat-header">
+        <h4 class="stat-label">@Label</h4>
+        <div class="stat-icon-wrapper">
+            <Icons Name="@Icon" Size="20" />
+        </div>
+    </div>
+    <div>
+        @if (IsUnavailable)
+        {
+            <div class="stat-unavailable">@(UnavailableReason ?? "Not supported by API")</div>
+        }
+        else
+        {
+            <div class="stat-value">@Value</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Subtext))
+        {
+            <div class="stat-subtext">@Subtext</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Icon { get; set; } = "dashboard";
+    [Parameter] public string? Subtext { get; set; }
+    [Parameter] public bool IsUnavailable { get; set; }
+    [Parameter] public string? UnavailableReason { get; set; }
+}
+

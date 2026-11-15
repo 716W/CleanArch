@@ -1,0 +1,35 @@
+<div class="gym-form-group">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="gym-label">
+            @Label
+            @if (IsRequired)
+            {
+                <span class="required-star" aria-hidden="true">*</span>
+            }
+        </label>
+    }
+
+    @ChildContent
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="gym-field-error">
+            <Icons Name="alert" Size="14" />
+            <span>@Error</span>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <div class="gym-form-hint">@Hint</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool IsRequired { get; set; }
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
+

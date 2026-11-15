@@ -1,0 +1,19 @@
+<div class="state-container">
+    <div class="state-icon">
+        <Icons Name="@Icon" Size="48" />
+    </div>
+    <h3 class="state-title">@Title</h3>
+    <p class="state-description">@Description</p>
+    @if (ActionButton != null)
+    {
+        @ActionButton
+    }
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "search";
+    [Parameter] public string Title { get; set; } = "No items found";
+    [Parameter] public string Description { get; set; } = "There is no data to display right now.";
+    [Parameter] public RenderFragment? ActionButton { get; set; }
+}
+

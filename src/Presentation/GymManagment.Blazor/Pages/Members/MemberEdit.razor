@@ -1,0 +1,235 @@
+@page "/members/{Id:guid}/edit"
+@implements IDisposable
+@inject IMemberService MemberService
+@inject NavigationManager Navigation
+
+<div class="member-edit-page" style="max-width: 680px;">
+    <div class="mb-3">
+        <a href="members/@Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Profile
+        </a>
+    </div>
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" />
+    }
+
+    @if (_isLoading)
+    {
+        <LoadingIndicator Message="Loading member details..." />
+    }
+    else
+    {
+        <div class="gym-card">
+            <div class="gym-card-header">
+                <div>
+                    <h2 class="gym-card-title">Edit Member</h2>
+                    <div class="gym-card-subtitle">Update personal information for @_originalName</div>
+                </div>
+            </div>
+
+            <div class="gym-card-body">
+                <form @onsubmit="HandleSubmitAsync" @onsubmit:preventDefault="true">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <FormField Label="First Name"
+                                       IsRequired="true"
+                                       Error="@GetFieldError("FirstName")">
+                                <input type="text"
+                                       class="gym-input @(HasFieldError("FirstName") ? "gym-input-error" : "")"
+                                       @bind="_command.FirstName"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <FormField Label="Last Name"
+                                       IsRequired="true"
+                                       Error="@GetFieldError("LastName")">
+                                <input type="text"
+                                       class="gym-input @(HasFieldError("LastName") ? "gym-input-error" : "")"
+                                       @bind="_command.LastName"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+
+                        <div class="col-12">
+                            <FormField Label="Email Address"
+                                       IsRequired="true"
+                                       Error="@GetFieldError("Email")">
+                                <input type="email"
+                                       class="gym-input @(HasFieldError("Email") ? "gym-input-error" : "")"
+                                       @bind="_command.Email"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <FormField Label="Date of Birth"
+                                       IsRequired="true"
+                                       Error="@GetFieldError("DateOfBirth")">
+                                <input type="date"
+                                       class="gym-input @(HasFieldError("DateOfBirth") ? "gym-input-error" : "")"
+                                       @bind="_dobInput"
+                                       max="@DateTime.Today.AddDays(-1).ToString("yyyy-MM-dd")"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a href="members/@Id" class="btn-gym btn-gym-secondary" disabled="@_isSaving">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn-gym btn-gym-primary" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span>Saving Changes...</span>
+                            }
+                            else
+                            {
+                                <Icons Name="check" Size="16" />
+                                <span>Save Changes</span>
+                            }
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private UpdateMemberCommand _command = new();
+    private DateTime? _dobInput;
+    private string _originalName = "";
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private GymManagementApiException? _apiException;
+    private Dictionary<string, string> _clientErrors = new();
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMemberAsync();
+    }
+
+    private async Task LoadMemberAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var member = await MemberService.GetByIdAsync(Id, _cts.Token);
+            _originalName = $"{member.FirstName} {member.LastName}";
+            _command = new UpdateMemberCommand
+            {
+                Id = member.Id,
+                FirstName = member.FirstName,
+                LastName = member.LastName,
+                Email = member.Email,
+                DateOfBirth = member.DateOfBirth
+            };
+            _dobInput = member.DateOfBirth.Date;
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool HasFieldError(string fieldName) =>
+        _clientErrors.ContainsKey(fieldName) ||
+        (_apiException?.ValidationErrors != null && _apiException.ValidationErrors.ContainsKey(fieldName));
+
+    private string? GetFieldError(string fieldName)
+    {
+        if (_clientErrors.TryGetValue(fieldName, out var clientErr))
+            return clientErr;
+
+        if (_apiException?.ValidationErrors != null &&
+            _apiException.ValidationErrors.TryGetValue(fieldName, out var apiErrors))
+        {
+            return string.Join(" ", apiErrors);
+        }
+
+        return null;
+    }
+
+    private bool ValidateClient()
+    {
+        _clientErrors.Clear();
+
+        if (string.IsNullOrWhiteSpace(_command.FirstName))
+            _clientErrors["FirstName"] = "First name is required.";
+        else if (_command.FirstName.Length > 50)
+            _clientErrors["FirstName"] = "First name must not exceed 50 characters.";
+
+        if (string.IsNullOrWhiteSpace(_command.LastName))
+            _clientErrors["LastName"] = "Last name is required.";
+        else if (_command.LastName.Length > 50)
+            _clientErrors["LastName"] = "Last name must not exceed 50 characters.";
+
+        if (string.IsNullOrWhiteSpace(_command.Email))
+            _clientErrors["Email"] = "Email is required.";
+        else if (!_command.Email.Contains('@') || !_command.Email.Contains('.'))
+            _clientErrors["Email"] = "A valid email address is required.";
+        else if (_command.Email.Length > 100)
+            _clientErrors["Email"] = "Email must not exceed 100 characters.";
+
+        if (!_dobInput.HasValue)
+            _clientErrors["DateOfBirth"] = "Date of birth is required.";
+        else if (_dobInput.Value.Date >= DateTime.Today)
+            _clientErrors["DateOfBirth"] = "Date of birth must be in the past.";
+
+        return _clientErrors.Count == 0;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _apiException = null;
+
+        if (!ValidateClient())
+            return;
+
+        _isSaving = true;
+        try
+        {
+            _command.DateOfBirth = new DateTimeOffset(_dobInput!.Value, TimeSpan.Zero);
+            await MemberService.UpdateAsync(Id, _command);
+            Navigation.NavigateTo($"members/{Id}");
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

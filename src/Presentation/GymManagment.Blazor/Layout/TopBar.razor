@@ -1,0 +1,94 @@
+@inject NavigationManager Navigation
+
+<header class="app-topbar">
+    <div class="topbar-left">
+        <button type="button" class="mobile-toggle-btn" @onclick="HandleToggle" aria-label="Toggle navigation menu">
+            <Icons Name="menu" Size="20" />
+        </button>
+        <div>
+            <h1 class="page-header-title">@GetPageTitle()</h1>
+            <p class="page-header-subtitle">@GetPageSubtitle()</p>
+        </div>
+    </div>
+
+    <div class="topbar-actions">
+        <span class="text-muted d-none d-md-inline" style="font-size: 0.8125rem;">
+            @DateTime.Now.ToString("dddd, MMM d, yyyy")
+        </span>
+    </div>
+</header>
+
+@code {
+    [Parameter] public EventCallback OnToggleSidebar { get; set; }
+
+    private async Task HandleToggle()
+    {
+        if (OnToggleSidebar.HasDelegate)
+        {
+            await OnToggleSidebar.InvokeAsync();
+        }
+    }
+
+    private string GetPageTitle()
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLowerInvariant();
+        if (string.IsNullOrEmpty(uri) || uri == "dashboard")
+            return "Dashboard";
+        if (uri.StartsWith("members/create"))
+            return "New Member";
+        if (uri.StartsWith("members") && uri.Contains("/edit"))
+            return "Edit Member";
+        if (uri.StartsWith("members/"))
+            return "Member Profile";
+        if (uri.StartsWith("members"))
+            return "Members";
+        if (uri.StartsWith("membership-plans/create"))
+            return "New Plan";
+        if (uri.StartsWith("membership-plans") && uri.Contains("/edit"))
+            return "Edit Plan";
+        if (uri.StartsWith("membership-plans/"))
+            return "Plan Details";
+        if (uri.StartsWith("membership-plans"))
+            return "Membership Plans";
+        if (uri.StartsWith("memberships/create"))
+            return "Assign Membership";
+        if (uri.StartsWith("memberships/"))
+            return "Membership Details";
+        if (uri.StartsWith("memberships"))
+            return "Memberships";
+
+        return "Gym Management";
+    }
+
+    private string GetPageSubtitle()
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLowerInvariant();
+        if (string.IsNullOrEmpty(uri) || uri == "dashboard")
+            return "Live system metrics and gym overview";
+        if (uri.StartsWith("members/create"))
+            return "Register a new gym member";
+        if (uri.StartsWith("members") && uri.Contains("/edit"))
+            return "Update member information";
+        if (uri.StartsWith("members/"))
+            return "Member details and membership history";
+        if (uri.StartsWith("members"))
+            return "Manage all registered members";
+        if (uri.StartsWith("membership-plans/create"))
+            return "Define a new membership pricing plan";
+        if (uri.StartsWith("membership-plans") && uri.Contains("/edit"))
+            return "Modify plan parameters";
+        if (uri.StartsWith("membership-plans/"))
+            return "Plan configuration and terms";
+        if (uri.StartsWith("membership-plans"))
+            return "Manage membership plans and durations";
+        if (uri.StartsWith("memberships/create"))
+            return "Enroll a member into an active plan";
+        if (uri.StartsWith("memberships/"))
+            return "Subscription status and timeline";
+        if (uri.StartsWith("memberships"))
+            return "Search and track member subscriptions";
+
+        return "Professional Gym Administration";
+    }
+}
+

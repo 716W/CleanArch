@@ -31,7 +31,7 @@ public class MemberServiceTests
         };
 
         _mockClient
-            .Setup(c => c.MemberAllAsync(It.IsAny<CancellationToken>()))
+            .Setup(c => c.MembersAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(members);
 
         // Act
@@ -42,7 +42,7 @@ public class MemberServiceTests
         Assert.Equal(2, result.Count);
         Assert.Equal("John", result[0].FirstName);
         Assert.Equal("Jane", result[1].FirstName);
-        _mockClient.Verify(c => c.MemberAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockClient.Verify(c => c.MembersAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class MemberServiceTests
         };
 
         _mockClient
-            .Setup(c => c.MemberGETAsync(memberId, It.IsAny<CancellationToken>()))
+            .Setup(c => c.MembersGETAsync(memberId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
 
         // Act
@@ -98,7 +98,7 @@ public class MemberServiceTests
             null!);
 
         _mockClient
-            .Setup(c => c.MemberPOSTAsync(command, It.IsAny<CancellationToken>()))
+            .Setup(c => c.MembersPOSTAsync(command, It.IsAny<CancellationToken>()))
             .ThrowsAsync(apiException);
 
         // Act & Assert
@@ -132,7 +132,7 @@ public class MemberServiceTests
             null!);
 
         _mockClient
-            .Setup(c => c.MemberGETAsync(memberId, It.IsAny<CancellationToken>()))
+            .Setup(c => c.MembersGETAsync(memberId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(apiException);
 
         // Act & Assert
@@ -150,7 +150,7 @@ public class MemberServiceTests
         // Arrange
         var memberId = Guid.NewGuid();
         _mockClient
-            .Setup(c => c.MemberDELETEAsync(memberId, It.IsAny<CancellationToken>()))
+            .Setup(c => c.MembersDELETEAsync(memberId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -158,7 +158,7 @@ public class MemberServiceTests
 
         // Assert
         Assert.Null(exception);
-        _mockClient.Verify(c => c.MemberDELETEAsync(memberId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockClient.Verify(c => c.MembersDELETEAsync(memberId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
 

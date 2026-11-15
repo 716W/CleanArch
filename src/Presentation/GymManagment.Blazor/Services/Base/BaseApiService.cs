@@ -54,7 +54,8 @@ public abstract class BaseApiService
                 statusCode: ex.StatusCode,
                 title: ex.Result?.Title ?? "Validation failed",
                 detail: ex.Result?.Detail,
-                validationErrors: ex.Result?.Errors);
+                validationErrors: ex.Result?.Errors,
+                innerException: ex);
         }
         catch (ApiException<ProblemDetails> ex)
         {
@@ -68,7 +69,8 @@ public abstract class BaseApiService
             throw new GymManagementApiException(
                 statusCode: ex.StatusCode,
                 title: ex.Result?.Title ?? "An API error occurred",
-                detail: ex.Result?.Detail);
+                detail: ex.Result?.Detail,
+                innerException: ex);
         }
         catch (ApiException ex)
         {
@@ -81,7 +83,8 @@ public abstract class BaseApiService
             throw new GymManagementApiException(
                 statusCode: ex.StatusCode,
                 title: "An API error occurred",
-                detail: ex.Response);
+                detail: ex.Response,
+                innerException: ex);
         }
         catch (HttpRequestException ex)
         {
@@ -90,7 +93,8 @@ public abstract class BaseApiService
             throw new GymManagementApiException(
                 statusCode: 0,
                 title: "Network error",
-                detail: "Could not reach the API. Please check your connection.");
+                detail: "Could not reach the API. Please check your connection.",
+                innerException: ex);
         }
     }
 

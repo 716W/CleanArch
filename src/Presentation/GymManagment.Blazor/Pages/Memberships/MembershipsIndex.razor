@@ -1,0 +1,349 @@
+@page "/memberships"
+@implements IDisposable
+@inject IMembershipService MembershipService
+@inject IMemberService MemberService
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="memberships-index-page">
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" />
+    }
+
+    <!-- Header Actions & Search -->
+    <div class="filter-bar">
+        <div>
+            <h2 class="gym-card-title">Gym Memberships</h2>
+            <div class="gym-card-subtitle">Retrieve and review member subscription records</div>
+        </div>
+
+        <a href="memberships/create" class="btn-gym btn-gym-primary">
+            <Icons Name="plus" Size="16" /> Assign Membership
+        </a>
+    </div>
+
+    <!-- Search Controls Card -->
+    <div class="gym-card mb-4">
+        <div class="gym-card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="gym-label">Select Member</label>
+                    @if (_loadingMembers)
+                    {
+                        <div class="text-muted" style="font-size: 0.8125rem;">Loading members list...</div>
+                    }
+                    else
+                    {
+                        <select class="gym-select" value="@(_selectedMemberId?.ToString() ?? "")" @onchange="OnMemberSelected">
+                            <option value="">-- Choose a member to view subscriptions --</option>
+                            @foreach (var member in _allMembers)
+                            {
+                                <option value="@member.Id">
+                                    @member.FirstName @member.LastName (@member.Email) @(!member.IsActive ? " [Inactive]" : "")
+                                </option>
+                            }
+                        </select>
+                    }
+                </div>
+
+                <div class="col-12 col-md-5">
+                    <label class="gym-label">Or Find by Subscription ID</label>
+                    <div class="d-flex gap-2">
+                        <input type="text"
+                               class="gym-input"
+                               placeholder="e.g. 00000000-0000-0000-0000-000000000000"
+                               @bind="_searchMembershipId" />
+                        <button type="button" class="btn-gym btn-gym-secondary" @onclick="SearchByIdAsync">
+                            Lookup
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-1 text-md-end">
+                    <button type="button" class="btn-gym btn-gym-secondary" @onclick="RefreshAsync" title="Refresh">
+                        <Icons Name="refresh" Size="16" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="gym-card">
+        @if (_isLoading)
+        {
+            <LoadingIndicator Message="Fetching membership records..." />
+        }
+        else if (_selectedMemberId == null && _searchedMembership == null)
+        {
+            <div class="p-4">
+                <EmptyState Icon="id-card"
+                            Title="Select a Member"
+                            Description="Choose a member from the dropdown above to view their active and historical memberships.">
+                    <ActionButton>
+                        <a href="memberships/create" class="btn-gym btn-gym-primary btn-gym-sm">
+                            <Icons Name="plus" Size="14" /> Assign New Membership
+                        </a>
+                    </ActionButton>
+                </EmptyState>
+            </div>
+        }
+        else if (_searchedMembership != null)
+        {
+            <div class="gym-card-header">
+                <div>
+                    <h3 class="gym-card-title">Subscription Search Result</h3>
+                    <div class="gym-card-subtitle">ID: @_searchedMembership.Id</div>
+                </div>
+            </div>
+            <div class="gym-table-container">
+                <table class="gym-table">
+                    <thead>
+                        <tr>
+                            <th>Plan</th>
+                            <th>Member</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fw-semibold text-dark">@GetPlanName(_searchedMembership.MembershipPlanId)</td>
+                            <td>@GetMemberName(_searchedMembership.MemberId)</td>
+                            <td>@_searchedMembership.StartDate.ToString("MMM d, yyyy")</td>
+                            <td>@_searchedMembership.EndDate.ToString("MMM d, yyyy")</td>
+                            <td><StatusBadge Status="@_searchedMembership.Status" /></td>
+                            <td class="text-end">
+                                <a href="memberships/@_searchedMembership.Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+                                    Details
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (_memberships.Count == 0)
+        {
+            <div class="p-4">
+                <EmptyState Icon="id-card"
+                            Title="No Memberships Found"
+                            Description="This member has no membership subscriptions registered.">
+                    <ActionButton>
+                        @if (_selectedMember != null && _selectedMember.IsActive)
+                        {
+                            <a href="memberships/create?memberId=@_selectedMemberId" class="btn-gym btn-gym-primary btn-gym-sm">
+                                <Icons Name="plus" Size="14" /> Assign Membership Now
+                            </a>
+                        }
+                    </ActionButton>
+                </EmptyState>
+            </div>
+        }
+        else
+        {
+            <div class="gym-card-header">
+                <div>
+                    <h3 class="gym-card-title">
+                        Memberships for @(_selectedMember != null ? $"{_selectedMember.FirstName} {_selectedMember.LastName}" : "Member")
+                    </h3>
+                    <div class="gym-card-subtitle">@_memberships.Count records found</div>
+                </div>
+
+                @if (_selectedMember != null && _selectedMember.IsActive)
+                {
+                    <a href="memberships/create?memberId=@_selectedMemberId" class="btn-gym btn-gym-primary btn-gym-sm">
+                        <Icons Name="plus" Size="14" /> New Subscription
+                    </a>
+                }
+            </div>
+
+            <div class="gym-table-container">
+                <table class="gym-table">
+                    <thead>
+                        <tr>
+                            <th>Plan Name</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _memberships)
+                        {
+                            <tr>
+                                <td class="fw-semibold text-dark">@GetPlanName(m.MembershipPlanId)</td>
+                                <td>@m.StartDate.ToString("MMM d, yyyy")</td>
+                                <td>@m.EndDate.ToString("MMM d, yyyy")</td>
+                                <td><StatusBadge Status="@m.Status" /></td>
+                                <td class="text-end">
+                                    <a href="memberships/@m.Id" class="btn-gym btn-gym-secondary btn-gym-sm">
+                                        View Details
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public Guid? MemberId { get; set; }
+
+    private bool _loadingMembers = true;
+    private bool _isLoading;
+    private GymManagementApiException? _apiException;
+
+    private List<MemberResponse> _allMembers = new();
+    private Dictionary<Guid, string> _planNames = new();
+    private List<MembershipResponse> _memberships = new();
+    private MembershipResponse? _searchedMembership;
+
+    private Guid? _selectedMemberId;
+    private MemberResponse? _selectedMember;
+    private string _searchMembershipId = "";
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetadataAsync();
+
+        if (MemberId.HasValue && MemberId.Value != Guid.Empty)
+        {
+            _selectedMemberId = MemberId.Value;
+            await LoadMembershipsForSelectedMemberAsync();
+        }
+    }
+
+    private async Task LoadMetadataAsync()
+    {
+        _loadingMembers = true;
+        try
+        {
+            var membersTask = MemberService.GetAllAsync(_cts.Token);
+            var plansTask = MembershipPlanService.GetAllAsync(activeOnly: null, _cts.Token);
+
+            await Task.WhenAll(membersTask, plansTask);
+
+            _allMembers = (await membersTask).OrderBy(m => m.LastName).ThenBy(m => m.FirstName).ToList();
+            var plans = await plansTask;
+            _planNames = plans.ToDictionary(p => p.Id, p => p.Name);
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        finally
+        {
+            _loadingMembers = false;
+        }
+    }
+
+    private async Task OnMemberSelected(ChangeEventArgs e)
+    {
+        _searchedMembership = null;
+        var val = e.Value?.ToString();
+        if (Guid.TryParse(val, out var memberGuid))
+        {
+            _selectedMemberId = memberGuid;
+            await LoadMembershipsForSelectedMemberAsync();
+        }
+        else
+        {
+            _selectedMemberId = null;
+            _selectedMember = null;
+            _memberships.Clear();
+        }
+    }
+
+    private async Task LoadMembershipsForSelectedMemberAsync()
+    {
+        if (!_selectedMemberId.HasValue) return;
+
+        _isLoading = true;
+        _apiException = null;
+        _selectedMember = _allMembers.FirstOrDefault(m => m.Id == _selectedMemberId.Value);
+
+        try
+        {
+            var result = await MembershipService.GetByMemberIdAsync(_selectedMemberId.Value, _cts.Token);
+            _memberships = result.OrderByDescending(m => m.StartDate).ToList();
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+            _memberships.Clear();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SearchByIdAsync()
+    {
+        if (!Guid.TryParse(_searchMembershipId.Trim(), out var guid))
+        {
+            _apiException = new GymManagementApiException(400, "Invalid ID", "Please enter a valid GUID format for the membership ID.");
+            return;
+        }
+
+        _isLoading = true;
+        _apiException = null;
+        _selectedMemberId = null;
+        _memberships.Clear();
+
+        try
+        {
+            _searchedMembership = await MembershipService.GetByIdAsync(guid, _cts.Token);
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+            _searchedMembership = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_selectedMemberId.HasValue)
+        {
+            await LoadMembershipsForSelectedMemberAsync();
+        }
+        else if (_searchedMembership != null)
+        {
+            await SearchByIdAsync();
+        }
+        else
+        {
+            await LoadMetadataAsync();
+        }
+    }
+
+    private string GetPlanName(Guid planId) =>
+        _planNames.TryGetValue(planId, out var name) ? name : $"Plan {planId.ToString()[..8]}";
+
+    private string GetMemberName(Guid memberId)
+    {
+        var member = _allMembers.FirstOrDefault(m => m.Id == memberId);
+        return member != null ? $"{member.FirstName} {member.LastName}" : memberId.ToString()[..8];
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

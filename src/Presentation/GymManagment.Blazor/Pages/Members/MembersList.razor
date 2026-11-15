@@ -1,0 +1,277 @@
+@page "/members"
+@implements IDisposable
+@inject IMemberService MemberService
+@inject NavigationManager Navigation
+
+<div class="members-list-page">
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="gym-alert gym-alert-success mb-3" role="alert">
+            <Icons Name="check" Size="18" Class="text-success flex-shrink-0" />
+            <div class="gym-alert-body">
+                <div>@_successMessage</div>
+            </div>
+            <button type="button" class="btn-close ms-auto" @onclick="() => _successMessage = null" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" OnRetry="LoadMembersAsync" />
+    }
+
+    <!-- Header Actions & Search -->
+    <div class="filter-bar">
+        <div class="d-flex align-items-center gap-2 flex-grow-1 flex-wrap">
+            <div class="search-input-group">
+                <span class="search-icon"><Icons Name="search" Size="16" /></span>
+                <input type="text"
+                       class="gym-input"
+                       placeholder="Search by name or email..."
+                       @bind="_searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <div style="min-width: 140px;">
+                <select class="gym-select" @bind="_statusFilter">
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                </select>
+            </div>
+
+            <button type="button" class="btn-gym btn-gym-secondary" @onclick="LoadMembersAsync" title="Refresh">
+                <Icons Name="refresh" Size="16" />
+            </button>
+        </div>
+
+        <a href="members/create" class="btn-gym btn-gym-primary">
+            <Icons Name="plus" Size="16" /> Register Member
+        </a>
+    </div>
+
+    <!-- Table Card -->
+    <div class="gym-card">
+        @if (_isLoading)
+        {
+            <LoadingIndicator Message="Loading members directory..." />
+        }
+        else if (FilteredMembers.Count == 0)
+        {
+            <div class="p-4">
+                @if (!string.IsNullOrWhiteSpace(_searchTerm) || _statusFilter != "all")
+                {
+                    <EmptyState Icon="search"
+                                Title="No matching members"
+                                Description="Try clearing your search term or filter to see all members.">
+                        <ActionButton>
+                            <button type="button" class="btn-gym btn-gym-secondary btn-gym-sm" @onclick="ClearFilters">
+                                Clear Filters
+                            </button>
+                        </ActionButton>
+                    </EmptyState>
+                }
+                else
+                {
+                    <EmptyState Icon="members"
+                                Title="No members registered yet"
+                                Description="Get started by registering the first member in the gym system.">
+                        <ActionButton>
+                            <a href="members/create" class="btn-gym btn-gym-primary btn-gym-sm">
+                                <Icons Name="plus" Size="14" /> Register First Member
+                            </a>
+                        </ActionButton>
+                    </EmptyState>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="gym-table-container">
+                <table class="gym-table">
+                    <thead>
+                        <tr>
+                            <th>Member Name</th>
+                            <th>Email Address</th>
+                            <th>Date of Birth</th>
+                            <th>Joined Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var member in FilteredMembers)
+                        {
+                            <tr>
+                                <td>
+                                    <a href="members/@member.Id" class="fw-semibold text-dark text-decoration-none">
+                                        @member.FirstName @member.LastName
+                                    </a>
+                                </td>
+                                <td class="text-muted">@member.Email</td>
+                                <td>@member.DateOfBirth.ToString("MMM d, yyyy")</td>
+                                <td>@member.JoinedDate.ToString("MMM d, yyyy")</td>
+                                <td><StatusBadge IsActive="@member.IsActive" /></td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <a href="members/@member.Id" class="btn-gym btn-gym-secondary btn-gym-sm" title="View details">
+                                            View
+                                        </a>
+                                        <a href="members/@member.Id/edit" class="btn-gym btn-gym-secondary btn-gym-sm" title="Edit member">
+                                            <Icons Name="edit" Size="14" />
+                                        </a>
+                                        <button type="button"
+                                                class="btn-gym btn-gym-danger-outline btn-gym-sm"
+                                                @onclick="() => PromptDelete(member)"
+                                                title="Delete member">
+                                            <Icons Name="trash" Size="14" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="gym-card-footer justify-content-between">
+                <span class="text-muted" style="font-size: 0.8125rem;">
+                    Showing @FilteredMembers.Count of @_members.Count total members
+                </span>
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsOpen="_deleteDialogOpen"
+               Title="Delete Member"
+               Message="@($"Are you sure you want to permanently delete member '{_memberToDelete?.FirstName} {_memberToDelete?.LastName}' ({_memberToDelete?.Email})? This action cannot be undone.")"
+               ConfirmText="Delete Member"
+               IsDestructive="true"
+               IsBusy="_isDeleting"
+               OnConfirm="ConfirmDeleteAsync"
+               OnCancel="CancelDelete" />
+
+@code {
+    private bool _isLoading = true;
+    private bool _isDeleting;
+    private GymManagementApiException? _apiException;
+    private string? _successMessage;
+    private List<MemberResponse> _members = new();
+    private string _searchTerm = "";
+    private string _statusFilter = "all";
+
+    private bool _deleteDialogOpen;
+    private MemberResponse? _memberToDelete;
+    private CancellationTokenSource _cts = new();
+
+    private List<MemberResponse> FilteredMembers
+    {
+        get
+        {
+            var query = _members.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim();
+                query = query.Where(m =>
+                    (m.FirstName != null && m.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                    (m.LastName != null && m.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                    (m.Email != null && m.Email.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (_statusFilter == "active")
+            {
+                query = query.Where(m => m.IsActive);
+            }
+            else if (_statusFilter == "inactive")
+            {
+                query = query.Where(m => !m.IsActive);
+            }
+
+            return query.OrderBy(m => m.LastName).ThenBy(m => m.FirstName).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMembersAsync();
+    }
+
+    private async Task LoadMembersAsync()
+    {
+        _isLoading = true;
+        _apiException = null;
+
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            var result = await MemberService.GetAllAsync(_cts.Token);
+            _members = result.ToList();
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ClearFilters()
+    {
+        _searchTerm = "";
+        _statusFilter = "all";
+    }
+
+    private void PromptDelete(MemberResponse member)
+    {
+        _memberToDelete = member;
+        _deleteDialogOpen = true;
+    }
+
+    private void CancelDelete()
+    {
+        _deleteDialogOpen = false;
+        _memberToDelete = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_memberToDelete == null) return;
+
+        _isDeleting = true;
+        try
+        {
+            await MemberService.DeleteAsync(_memberToDelete.Id);
+            _members.RemoveAll(m => m.Id == _memberToDelete.Id);
+            _successMessage = $"Member '{_memberToDelete.FirstName} {_memberToDelete.LastName}' was successfully deleted.";
+            _deleteDialogOpen = false;
+            _memberToDelete = null;
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+            _deleteDialogOpen = false;
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

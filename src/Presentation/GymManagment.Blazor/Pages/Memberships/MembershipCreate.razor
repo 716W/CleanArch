@@ -1,0 +1,325 @@
+@page "/memberships/create"
+@implements IDisposable
+@inject IMembershipService MembershipService
+@inject IMemberService MemberService
+@inject IMembershipPlanService MembershipPlanService
+@inject NavigationManager Navigation
+
+<div class="membership-create-page" style="max-width: 680px;">
+    <div class="mb-3">
+        <a href="memberships" class="btn-gym btn-gym-secondary btn-gym-sm">
+            <Icons Name="arrow-left" Size="14" /> Back to Memberships
+        </a>
+    </div>
+
+    @if (_apiException != null)
+    {
+        <ErrorMessage Exception="_apiException" />
+    }
+
+    <div class="gym-card">
+        <div class="gym-card-header">
+            <div>
+                <h2 class="gym-card-title">Assign Membership Plan</h2>
+                <div class="gym-card-subtitle">Subscribe an active gym member to a membership tier</div>
+            </div>
+        </div>
+
+        <div class="gym-card-body">
+            @if (_isLoadingMetadata)
+            {
+                <LoadingIndicator Message="Loading members and available plans..." />
+            }
+            else
+            {
+                <form @onsubmit="HandleSubmitAsync" @onsubmit:preventDefault="true">
+                    <div class="row g-3">
+                        <!-- Member Selector -->
+                        <div class="col-12">
+                            <FormField Label="Gym Member"
+                                       IsRequired="true"
+                                       Hint="Only active members can be enrolled"
+                                       Error="@GetFieldError("MemberId")">
+                                <select class="gym-select @(HasFieldError("MemberId") ? "gym-input-error" : "")"
+                                        value="@(_command.MemberId != Guid.Empty ? _command.MemberId.ToString() : "")"
+                                        @onchange="OnMemberChanged"
+                                        disabled="@_isSaving">
+                                    <option value="">-- Select Member --</option>
+                                    @foreach (var member in _activeMembers)
+                                    {
+                                        <option value="@member.Id">
+                                            @member.FirstName @member.LastName (@member.Email)
+                                        </option>
+                                    }
+                                </select>
+                            </FormField>
+                        </div>
+
+                        <!-- Membership Plan Selector -->
+                        <div class="col-12">
+                            <FormField Label="Membership Plan"
+                                       IsRequired="true"
+                                       Hint="Select an active subscription tier"
+                                       Error="@GetFieldError("MembershipPlanId")">
+                                <select class="gym-select @(HasFieldError("MembershipPlanId") ? "gym-input-error" : "")"
+                                        value="@(_command.MembershipPlanId != Guid.Empty ? _command.MembershipPlanId.ToString() : "")"
+                                        @onchange="OnPlanChanged"
+                                        disabled="@_isSaving">
+                                    <option value="">-- Select Active Plan --</option>
+                                    @foreach (var plan in _activePlans)
+                                    {
+                                        <option value="@plan.Id">
+                                            @plan.Name — $@plan.Price.ToString("N2") (@plan.DurationInDays days)
+                                        </option>
+                                    }
+                                </select>
+                            </FormField>
+                        </div>
+
+                        <!-- Start Date -->
+                        <div class="col-12 col-md-6">
+                            <FormField Label="Start Date"
+                                       IsRequired="true"
+                                       Error="@GetFieldError("StartDate")">
+                                <input type="date"
+                                       class="gym-input @(HasFieldError("StartDate") ? "gym-input-error" : "")"
+                                       @bind="_startDateInput"
+                                       @bind:after="OnDateChanged"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+
+                        <!-- Payment Transaction ID -->
+                        <div class="col-12 col-md-6">
+                            <FormField Label="Payment Transaction Reference"
+                                       IsRequired="true"
+                                       Hint="Receipt, invoice or gateway ref (max 200)"
+                                       Error="@GetFieldError("PaymentTransactionId")">
+                                <input type="text"
+                                       class="gym-input @(HasFieldError("PaymentTransactionId") ? "gym-input-error" : "")"
+                                       placeholder="e.g. TXN-2026-98741"
+                                       @bind="_command.PaymentTransactionId"
+                                       disabled="@_isSaving" />
+                            </FormField>
+                        </div>
+                    </div>
+
+                    <!-- Calculated Subscription Preview -->
+                    @if (_selectedPlan != null && _startDateInput.HasValue)
+                    {
+                        <div class="gym-alert gym-alert-info mt-3 mb-0">
+                            <Icons Name="calendar" Size="20" Class="text-primary flex-shrink-0" />
+                            <div class="gym-alert-body">
+                                <div class="gym-alert-title">Subscription Preview</div>
+                                <div class="row g-2 mt-1" style="font-size: 0.8125rem;">
+                                    <div class="col-sm-6">
+                                        <strong>Plan:</strong> @_selectedPlan.Name ($@_selectedPlan.Price.ToString("N2"))
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <strong>Duration:</strong> @_selectedPlan.DurationInDays calendar days
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <strong>Start:</strong> @_startDateInput.Value.ToString("MMM d, yyyy")
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <strong>Calculated End Date:</strong> @_startDateInput.Value.AddDays(_selectedPlan.DurationInDays).ToString("MMM d, yyyy")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a href="memberships" class="btn-gym btn-gym-secondary" disabled="@_isSaving">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn-gym btn-gym-primary" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span>Assigning Membership...</span>
+                            }
+                            else
+                            {
+                                <Icons Name="check" Size="16" />
+                                <span>Confirm & Assign Membership</span>
+                            }
+                        </button>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public Guid? MemberId { get; set; }
+
+    private CreateMembershipCommand _command = new();
+    private DateTime? _startDateInput = DateTime.Today;
+    private bool _isLoadingMetadata = true;
+    private bool _isSaving;
+    private GymManagementApiException? _apiException;
+
+    private List<MemberResponse> _activeMembers = new();
+    private List<MembershipPlanResponse> _activePlans = new();
+    private MembershipPlanResponse? _selectedPlan;
+    private Dictionary<string, string> _clientErrors = new();
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMetadataAsync();
+
+        if (MemberId.HasValue && MemberId.Value != Guid.Empty)
+        {
+            _command.MemberId = MemberId.Value;
+        }
+
+        // Generate a suggested clean reference ID
+        if (string.IsNullOrWhiteSpace(_command.PaymentTransactionId))
+        {
+            _command.PaymentTransactionId = $"TXN-{DateTime.Now:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
+        }
+    }
+
+    private async Task LoadMetadataAsync()
+    {
+        _isLoadingMetadata = true;
+        _apiException = null;
+
+        try
+        {
+            var membersTask = MemberService.GetAllAsync(_cts.Token);
+            var plansTask = MembershipPlanService.GetAllAsync(activeOnly: true, _cts.Token);
+
+            await Task.WhenAll(membersTask, plansTask);
+
+            _activeMembers = (await membersTask)
+                .Where(m => m.IsActive)
+                .OrderBy(m => m.LastName)
+                .ThenBy(m => m.FirstName)
+                .ToList();
+
+            _activePlans = (await plansTask)
+                .OrderBy(p => p.DisplayOrder)
+                .ThenBy(p => p.Name)
+                .ToList();
+
+            if (_activePlans.Count > 0 && _command.MembershipPlanId == Guid.Empty)
+            {
+                _command.MembershipPlanId = _activePlans[0].Id;
+                _selectedPlan = _activePlans[0];
+            }
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        finally
+        {
+            _isLoadingMetadata = false;
+        }
+    }
+
+    private void OnMemberChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var guid))
+        {
+            _command.MemberId = guid;
+        }
+        else
+        {
+            _command.MemberId = Guid.Empty;
+        }
+    }
+
+    private void OnPlanChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var guid))
+        {
+            _command.MembershipPlanId = guid;
+            _selectedPlan = _activePlans.FirstOrDefault(p => p.Id == guid);
+        }
+        else
+        {
+            _command.MembershipPlanId = Guid.Empty;
+            _selectedPlan = null;
+        }
+    }
+
+    private void OnDateChanged()
+    {
+        StateHasChanged();
+    }
+
+    private bool HasFieldError(string fieldName) =>
+        _clientErrors.ContainsKey(fieldName) ||
+        (_apiException?.ValidationErrors != null && _apiException.ValidationErrors.ContainsKey(fieldName));
+
+    private string? GetFieldError(string fieldName)
+    {
+        if (_clientErrors.TryGetValue(fieldName, out var clientErr))
+            return clientErr;
+
+        if (_apiException?.ValidationErrors != null &&
+            _apiException.ValidationErrors.TryGetValue(fieldName, out var apiErrors))
+        {
+            return string.Join(" ", apiErrors);
+        }
+
+        return null;
+    }
+
+    private bool ValidateClient()
+    {
+        _clientErrors.Clear();
+
+        if (_command.MemberId == Guid.Empty)
+            _clientErrors["MemberId"] = "Please select a member.";
+
+        if (_command.MembershipPlanId == Guid.Empty)
+            _clientErrors["MembershipPlanId"] = "Please select a membership plan.";
+
+        if (!_startDateInput.HasValue)
+            _clientErrors["StartDate"] = "Start date is required.";
+
+        if (string.IsNullOrWhiteSpace(_command.PaymentTransactionId))
+            _clientErrors["PaymentTransactionId"] = "Payment transaction reference is required.";
+        else if (_command.PaymentTransactionId.Length > 200)
+            _clientErrors["PaymentTransactionId"] = "Transaction ID must not exceed 200 characters.";
+
+        return _clientErrors.Count == 0;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _apiException = null;
+
+        if (!ValidateClient())
+            return;
+
+        _isSaving = true;
+        try
+        {
+            _command.StartDate = new DateTimeOffset(_startDateInput!.Value, TimeSpan.Zero);
+            var created = await MembershipService.CreateAsync(_command);
+            Navigation.NavigateTo($"memberships/{created.Id}");
+        }
+        catch (GymManagementApiException ex)
+        {
+            _apiException = ex;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
+

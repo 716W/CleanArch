@@ -45,8 +45,9 @@ public sealed class GymManagementApiException : Exception
         int statusCode,
         string title,
         string? detail = null,
-        IDictionary<string, ICollection<string>>? validationErrors = null)
-        : base(BuildMessage(statusCode, title, detail))
+        IDictionary<string, ICollection<string>>? validationErrors = null,
+        Exception? innerException = null)
+        : base(BuildMessage(statusCode, title, detail), innerException)
     {
         StatusCode = statusCode;
         Title = title;
